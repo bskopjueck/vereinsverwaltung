@@ -397,7 +397,7 @@ function kontaktLoeschen(id){
    ============================================================ */
 var W={};
 function vAufnahme(kontaktId){
-  W={step:1,kontaktId:kontaktId||null,art:'aktiv',eintritt:heute(),shirt:'L',zahlung:'ueberweisung',eintrittsgeld:true,ratenEintritt:1,beitragStellen:true,raten:DB.settings.ratenDefault||1,notiz:''};
+  W={step:1,kontaktId:kontaktId||null,art:'aktiv',eintritt:heute(),shirt:'L',zahlung:'ueberweisung',eintrittsgeld:true,ratenEintritt:1,eintrittPlan:null,beitragStellen:true,raten:DB.settings.ratenDefault||1,beitragPlan:null,notiz:''};
   renderWizard();
 }
 function renderWizard(){
@@ -422,9 +422,9 @@ function renderWizard(){
       '<div class="frow"><div class="field"><label>Shirtgröße (Mitgliedsshirt)</label><select id="w_shirt" onchange="W.shirt=this.value">'+['S','M','L','XL','XXL','3XL','4XL','5XL'].map(function(g){return '<option'+(W.shirt===g?' selected':'')+'>'+g+'</option>';}).join('')+'</select></div>'+
       '<div class="field"><label>Zahlungsweise</label><select id="w_zahlung" onchange="W.zahlung=this.value"><option value="ueberweisung"'+(W.zahlung==='ueberweisung'?' selected':'')+'>Überweisung</option><option value="bar"'+(W.zahlung==='bar'?' selected':'')+'>Bar</option><option value="lastschrift"'+(W.zahlung==='lastschrift'?' selected':'')+'>Lastschrift</option></select></div></div>'+
       '<label class="check"><input type="checkbox" '+(W.eintrittsgeld?'checked':'')+' onchange="W.eintrittsgeld=this.checked;renderWizard()"> <span><b>Eintrittsgeld '+eur(s.eintrittsgeld)+' berechnen</b><br><small style="color:var(--grau)">Bei Aufnahme als aktives Mitglied fällig. Wird als Forderung gebucht und erscheint auf dem Aufnahmebeleg.</small></span></label>'+
-      (W.eintrittsgeld?'<div class="field" style="margin:.2rem 0 .6rem 1.65rem;max-width:240px"><label>Eintrittsgeld zahlbar in</label><select onchange="W.ratenEintritt=this.value">'+[1,2,3].map(function(r){return '<option value="'+r+'"'+(r==(W.ratenEintritt||1)?' selected':'')+'>'+(r===1?'1 (Gesamtbetrag – Standard)':r+' Raten')+'</option>';}).join('')+'</select></div>':'')+
+      (W.eintrittsgeld?'<div class="field" style="margin:.2rem 0 .6rem 1.65rem;max-width:240px"><label>Eintrittsgeld zahlbar in</label><select onchange="W.ratenEintritt=this.value;W.eintrittPlan=null;renderWizard()">'+[1,2,3].map(function(r){return '<option value="'+r+'"'+(r==(W.ratenEintritt||1)?' selected':'')+'>'+(r===1?'1 (Gesamtbetrag – Standard)':r+' Raten')+'</option>';}).join('')+'</select>'+wizPlanHTML('eintritt')+'</div>':'')+
       '<label class="check"><input type="checkbox" '+(W.beitragStellen?'checked':'')+' onchange="W.beitragStellen=this.checked;renderWizard()"> <span><b>Jahresbeitrag '+jahrVon(W.eintritt)+' sofort stellen ('+eur(s.beitraege[W.art])+')</b><br><small style="color:var(--grau)">Wird als offene Forderung gebucht. Abwählen, wenn der Beitrag erst im nächsten Jahr beginnt.</small></span></label>'+
-      (W.beitragStellen?'<div class="field" style="margin:.2rem 0 .6rem 1.65rem;max-width:240px"><label>Beitrag zahlbar in</label><select onchange="W.raten=this.value">'+[1,2,3,4,6,12].map(function(r){return '<option value="'+r+'"'+(r==(W.raten||1)?' selected':'')+'>'+(r===1?'1 (Gesamtbetrag)':r+' Raten')+'</option>';}).join('')+'</select></div>':'')+
+      (W.beitragStellen?'<div class="field" style="margin:.2rem 0 .6rem 1.65rem;max-width:240px"><label>Beitrag zahlbar in</label><select onchange="W.raten=this.value;W.beitragPlan=null;renderWizard()">'+[1,2,3,4,6,12].map(function(r){return '<option value="'+r+'"'+(r==(W.raten||1)?' selected':'')+'>'+(r===1?'1 (Gesamtbetrag)':r+' Raten')+'</option>';}).join('')+'</select>'+wizPlanHTML('beitrag')+'</div>':'')+
       '<div class="field" style="margin-top:.8rem"><label>Notiz (optional)</label><textarea id="w_notiz" onchange="W.notiz=this.value">'+esc(W.notiz)+'</textarea></div></div>'+
       '<div class="mfoot"><button class="btn btn-hell" onclick="W.step=1;renderWizard()">Zurück</button><button class="btn btn-rot" onclick="W.step=3;renderWizard()">Weiter zur Prüfung</button></div>';
   }
@@ -1016,21 +1016,6 @@ function beitragStellen(id){
   '<div class="hint">'+eur(s.beitraege[m.art])+' ('+ARTEN[m.art]+'), 1. Fälligkeit am '+esc(s.faelligkeit.split('-')[1]+'.'+s.faelligkeit.split('-')[0]+'.')+' des Beitragsjahres, weitere Raten im Abstand von '+(s.ratenAbstand||2)+' Monaten. Bereits gestellte Jahre: '+(m.beitragsjahre.join(', ')||'–')+'</div>'+
   '<div class="mfoot"><button class="btn btn-hell" onclick="mitgliedDetail(\''+id+'\')">Abbrechen</button><button class="btn btn-rot" onclick="(function(){var m=mitglied(\''+id+'\');var j=parseInt(val(\'bs_jahr\'),10);if(!j)return;if(!stellBeitrag(m,j,val(\'bs_raten\'))){toast(\'Beitrag \'+j+\' wurde bereits gestellt\',true);return;}save();toast(\'Beitrag \'+j+\' gestellt\');mitgliedDetail(\''+id+'\');})()">Stellen & buchen</button></div>');
 }
-function jahresbeitraegeStellen(ids){
-  var s=DB.settings;var alle=!ids;
-  var kand=DB.mitglieder.filter(function(m){return m.status==='aktiv'&&(!ids||ids.indexOf(m.id)>=0);});
-  openModal('<h2>Jahresbeiträge stellen'+(alle?'':' ('+kand.length+' ausgewählte)')+'</h2>'+
-  '<div class="frow"><div class="field"><label>Beitragsjahr</label><input id="jb_jahr" type="number" value="'+s.geschaeftsjahr+'"></div><div class="field"><label>Zahlbar in</label>'+ratenSelect('jb_raten',s.ratenDefault)+'</div></div>'+
-  '<div class="hint">Gestellt wird nur für aktive Mitglieder, die für das Jahr noch keinen Beitrag haben. Jede Rate wird als eigene offene Forderung mit Fälligkeitsdatum gebucht – das Mahnwesen greift automatisch.</div>'+
-  '<div class="mfoot"><button class="btn btn-hell" onclick="closeModal()">Abbrechen</button><button class="btn btn-rot" onclick="jahresbeitraegeAusfuehren('+(alle?'null':JSON.stringify(ids).replace(/"/g,'&quot;'))+')">Beiträge stellen</button></div>');
-}
-function jahresbeitraegeAusfuehren(ids){
-  var jahr=parseInt(val('jb_jahr'),10);var raten=val('jb_raten');if(!jahr)return;
-  var n=0,skip=0;
-  DB.mitglieder.filter(function(m){return m.status==='aktiv'&&(!ids||ids.indexOf(m.id)>=0);}).forEach(function(m){if(stellBeitrag(m,jahr,raten))n++;else skip++;});
-  save();closeModal();toast(n+' Beiträge gestellt'+(skip?', '+skip+' bereits vorhanden':''));go('offen');
-}
-
 /* ---------- Mitgliederliste PRO ---------- */
 window._msel=window._msel||{};
 function mSelIds(){return Object.keys(window._msel).filter(function(id){return mitglied(id);});}
@@ -1248,22 +1233,24 @@ function vKontakte(){
    V5: BUCHUNGEN BEARBEITEN, IMPORT, UMLAGEN, KÜNDIGUNG, RATEN
    ============================================================ */
 function splitBetraege(betrag,raten){raten=Math.max(1,Math.min(12,parseInt(raten,10)||1));var cents=Math.round((Number(betrag)||0)*100);var base=Math.floor(cents/raten);var out=[];for(var i=0;i<raten;i++)out.push((i===raten-1?cents-base*(raten-1):base)/100);return out;}
-function stellBeitrag(m,jahr,raten,datum){
+function stellBeitrag(m,jahr,raten,datum,plan){
   var s=DB.settings;if(m.beitragsjahre.indexOf(jahr)>=0)return 0;
   var start=datum||heute();var f0=jahr+'-'+s.faelligkeit;
   if(f0<start){var d0=new Date(start+'T00:00:00');d0.setDate(d0.getDate()+14);f0=d0.toISOString().slice(0,10);}
-  var teile=splitBetraege(s.beitraege[m.art]||0,raten);
-  teile.forEach(function(bt,i){buche({datum:start,faellig:addMonate(f0,i*(s.ratenAbstand||2)),jahr:jahr,text:'Jahresbeitrag '+jahr+(teile.length>1?' (Rate '+(i+1)+'/'+teile.length+')':'')+' '+ARTEN[m.art]+' – '+kName(m.kontaktId)+' ('+m.mitgliedsnr+')',soll:'1400',haben:'4000',betrag:bt,kontaktId:m.kontaktId,mitgliedId:m.id,art:'beitrag',status:'offen'});});
-  m.beitragsjahre.push(jahr);return teile.length;
+  var rows=plan&&plan.length?plan:planVorschlag(s.beitraege[m.art]||0,raten,f0);
+  rows.forEach(function(r,i){buche({datum:start,faellig:r.faellig,jahr:jahr,text:'Jahresbeitrag '+jahr+(rows.length>1?' (Rate '+(i+1)+'/'+rows.length+')':'')+' '+ARTEN[m.art]+' – '+kName(m.kontaktId)+' ('+m.mitgliedsnr+')',soll:'1400',haben:'4000',betrag:r.betrag,kontaktId:m.kontaktId,mitgliedId:m.id,art:'beitrag',status:'offen'});});
+  m.beitragsjahre.push(jahr);return rows.length;
 }
 function mitgliedAnlegen(){
   var s=DB.settings;var k=kontakt(W.kontaktId);if(!k)return;
+  if(W.eintrittsgeld&&!wizPlanValid('eintrittPlan',s.eintrittsgeld,W.ratenEintritt))return;
+  if(W.beitragStellen&&!wizPlanValid('beitragPlan',s.beitraege[W.art]||0,W.raten))return;
   var m={id:uid(),mitgliedsnr:nextMnr(),kontaktId:k.id,art:W.art,eintritt:W.eintritt,austritt:null,austrittsgrund:null,status:'aktiv',shirtgroesse:W.shirt,zahlungsweise:W.zahlung,notizen:W.notiz,beitragsjahre:[],erstellt:new Date().toISOString(),login:null,mandat:{status:'keins'}};
   DB.mitglieder.push(m);
   var belegIds=[];
-  if(W.eintrittsgeld){var teile=splitBetraege(s.eintrittsgeld,W.ratenEintritt||1);
-    teile.forEach(function(bt,i){belegIds.push(buche({datum:W.eintritt,faellig:addMonate(W.eintritt,i*(s.ratenAbstand||2)),text:'Eintrittsgeld'+(teile.length>1?' (Rate '+(i+1)+'/'+teile.length+')':'')+' '+kName(k.id)+' ('+m.mitgliedsnr+')',soll:'1400',haben:'4010',betrag:bt,kontaktId:k.id,mitgliedId:m.id,art:'eintrittsgeld',status:'offen'}).id);});}
-  if(W.beitragStellen){var vorher=DB.buchungen.length;stellBeitrag(m,jahrVon(W.eintritt),W.raten||1,W.eintritt);DB.buchungen.slice(vorher).forEach(function(b){belegIds.push(b.id);});}
+  if(W.eintrittsgeld){var eRows=(W.eintrittPlan&&W.eintrittPlan.length==(W.ratenEintritt||1))?W.eintrittPlan:planVorschlag(s.eintrittsgeld,W.ratenEintritt||1,W.eintritt);
+    eRows.forEach(function(r,i){belegIds.push(buche({datum:W.eintritt,faellig:r.faellig,text:'Eintrittsgeld'+(eRows.length>1?' (Rate '+(i+1)+'/'+eRows.length+')':'')+' '+kName(k.id)+' ('+m.mitgliedsnr+')',soll:'1400',haben:'4010',betrag:r.betrag,kontaktId:k.id,mitgliedId:m.id,art:'eintrittsgeld',status:'offen'}).id);});}
+  if(W.beitragStellen){var vorher=DB.buchungen.length;stellBeitrag(m,jahrVon(W.eintritt),W.raten||1,W.eintritt,(W.beitragPlan&&W.beitragPlan.length==(W.raten||1))?W.beitragPlan:null);DB.buchungen.slice(vorher).forEach(function(b){belegIds.push(b.id);});}
   save();
   var fd=fehlendeDaten(m);
   C('<div class="card" style="text-align:center;padding:2.5rem"><div style="width:72px;height:72px;border-radius:50%;background:var(--gruen);color:#fff;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem"><svg class="ic" viewBox="0 0 24 24" style="width:34px;height:34px;stroke-width:2.6"><path d="M4 12.5l5 5L20 6.5"/></svg></div>'+
@@ -1322,7 +1309,7 @@ function umlageDialog(ids){
   var vorhanden=[];DB.buchungen.forEach(function(b){if(b.umlage&&vorhanden.indexOf(b.umlage)<0)vorhanden.push(b.umlage);});
   openModal('<h2>Sonderforderung stellen</h2><div class="hint">Eigene Forderungslisten neben dem Jahresbeitrag – z. B. <b>„Karnevalsgeld '+s.geschaeftsjahr+'“</b>, Kostümumlage oder Wagenbau-Umlage. Pro Mitglied entsteht eine offene Forderung (optional in Raten) mit Fälligkeitsdatum – Mahnwesen und Lastschrift-Einzug greifen automatisch. Wer die Forderung schon hat, wird übersprungen.</div>'+
   '<div class="field"><label>Bezeichnung</label><input id="um_titel" list="um_liste" placeholder="Karnevalsgeld '+s.geschaeftsjahr+'"><datalist id="um_liste">'+vorhanden.map(function(t){return '<option value="'+esc(t)+'">';}).join('')+'</datalist></div>'+
-  '<div class="frow3"><div class="field"><label>Betrag pro Mitglied (€)</label><input id="um_betrag" type="number" step="0.01" min="0.01"></div><div class="field"><label>Fällig am</label><input id="um_faellig" type="date" value="'+fristDatum(30)+'"></div><div class="field"><label>Zahlbar in</label>'+ratenSelect('um_raten',1)+'</div></div>'+
+  '<div class="frow3"><div class="field"><label>Betrag pro Mitglied (€)</label><input id="um_betrag" type="number" step="0.01" min="0.01" oninput="umPlanRender()"></div><div class="field"><label>Fällig am</label><input id="um_faellig" type="date" value="'+fristDatum(30)+'" onchange="umPlanRender()"></div><div class="field"><label>Zahlbar in</label>'+ratenSelect('um_raten',1).replace('<select id="um_raten">','<select id="um_raten" onchange="umPlanRender()">')+'</div></div>'+'<div id="um_plan"></div>'+
   '<div class="frow"><div class="field"><label>Erlöskonto</label><select id="um_konto">'+kEinn.map(function(k){return '<option value="'+k.nr+'"'+(k.nr==='4400'?' selected':'')+'>'+k.nr+' '+k.name+'</option>';}).join('')+'</select></div>'+
   '<div class="field"><label>Zielgruppe</label><select id="um_ziel">'+(ids?'<option value="auswahl">Aktuelle Auswahl ('+ids.length+')</option>':'')+'<option value="aktive">Alle aktiven Mitglieder</option><option value="aktivart">Nur „Aktive Mitgliedschaft“</option><option value="ehren">Nur Ehrenmitglieder</option></select></div></div>'+
   '<div class="mfoot"><button class="btn btn-hell" onclick="closeModal()">Abbrechen</button><button class="btn btn-rot" onclick="umlageAusfuehren('+(ids?JSON.stringify(ids).replace(/"/g,'&quot;'):'null')+')">Forderungen stellen</button></div>');
@@ -1335,11 +1322,13 @@ function umlageAusfuehren(ids){
   if(ziel==='auswahl'&&ids)pool=pool.filter(function(m){return ids.indexOf(m.id)>=0;});
   if(ziel==='aktivart')pool=pool.filter(function(m){return m.art==='aktiv';});
   if(ziel==='ehren')pool=pool.filter(function(m){return m.art!=='aktiv';});
+  var plan=null;
+  if((parseInt(raten,10)||1)>1){plan=ratenPlanLesen('um',betrag);if(!plan)return;}
+  var rows=plan||[{betrag:betrag,faellig:f0}];
   var n=0,skip=0;
   pool.forEach(function(m){
     if(DB.buchungen.some(function(b){return b.mitgliedId===m.id&&b.umlage===titel&&b.status!=='storniert';})){skip++;return;}
-    var teile=splitBetraege(betrag,raten);
-    teile.forEach(function(bt,i){buche({datum:heute(),faellig:addMonate(f0,i*(s.ratenAbstand||2)),umlage:titel,text:titel+(teile.length>1?' (Rate '+(i+1)+'/'+teile.length+')':'')+' – '+kName(m.kontaktId)+' ('+m.mitgliedsnr+')',soll:'1400',haben:konto,betrag:bt,kontaktId:m.kontaktId,mitgliedId:m.id,art:'umlage',status:'offen'});});
+    rows.forEach(function(r,i){buche({datum:heute(),faellig:r.faellig,umlage:titel,text:titel+(rows.length>1?' (Rate '+(i+1)+'/'+rows.length+')':'')+' – '+kName(m.kontaktId)+' ('+m.mitgliedsnr+')',soll:'1400',haben:konto,betrag:r.betrag,kontaktId:m.kontaktId,mitgliedId:m.id,art:'umlage',status:'offen'});});
     n++;
   });
   save();closeModal();toast(n+' Forderungen „'+titel+'“ gestellt'+(skip?', '+skip+' übersprungen':''));go('offen');
@@ -1926,6 +1915,139 @@ function claudeCloudHTML(){
   '<div class="mfoot" style="justify-content:flex-start"><button class="btn btn-gruen btn-sm" onclick="CL.dirty=true;cdbPush()">Jetzt speichern</button><button class="btn btn-hell btn-sm" onclick="cdbPull(function(){go(\'cloud\');toast(\'Team-Stand geladen\');})">Team-Stand laden</button></div></div>'+
   '<div class="card"><h3>So funktioniert es</h3><p style="font-size:.85rem;color:var(--grau);line-height:1.6">Jede Änderung wird ~1 Sekunde nach dem Speichern in den gemeinsamen Vereinsspeicher geschrieben; Änderungen der anderen erscheinen automatisch live. Ändern zwei Personen gleichzeitig, fragt die App, welcher Stand gilt. Trotzdem gilt: regelmäßig ein Backup ziehen (Einstellungen).</p></div></div>'+
   '<div><div class="card"><h3>Team-Zugang</h3><p style="font-size:.85rem;line-height:1.65">So kommen deine Vorstände rein:</p><ol style="font-size:.85rem;line-height:1.7;padding-left:1.2rem;margin:.5rem 0"><li>Öffne diese Seite über den <b>Teilen-Knopf</b> des Artifacts und gib den Link an deine Vorstände.</li><li>Jede Person meldet sich mit ihrem <b>Claude-Konto</b> an – der Speicher ist nur für Mitglieder deiner Claude-Organisation zugänglich, Fremde mit dem Link sehen nichts.</li><li>Beim ersten Öffnen gibt jede/r einmal den Namen ein – fertig.</li></ol><p style="font-size:.78rem;color:var(--grau)">Wer Zugriff hat, steuerst du also über das Teilen des Links bzw. deine Claude-Organisation – eine separate Benutzerfreischaltung ist hier nicht nötig. Für ein Hosting außerhalb von Claude (eigene Domain, beliebige Nutzer) bleibt der GitHub+Supabase-Weg aus dem Download-Paket bestehen.</p></div></div></div>';
+}
+
+/* ============================================================
+   V9: RATENPLAN – Betrag & Fälligkeit je Rate frei einstellbar
+   ============================================================ */
+function planVorschlag(betrag,raten,f0,abstand){
+  var teile=splitBetraege(betrag,raten);
+  return teile.map(function(bt,i){return {betrag:bt,faellig:addMonate(f0,i*(abstand||DB.settings.ratenAbstand||2))};});
+}
+function ratenPlanHTML(prefix,plan,soll,titel){
+  var rows=plan.map(function(r,i){
+    return '<tr><td style="white-space:nowrap;color:var(--grau);font-size:.82rem">Rate '+(i+1)+'</td>'+
+    '<td><input type="number" step="0.01" min="0.01" class="rp_b_'+prefix+'" value="'+r.betrag+'" oninput="ratenPlanSumme(\''+prefix+'\','+soll+')" style="width:110px;padding:.35rem .5rem;border:1.5px solid var(--linie);border-radius:6px"></td>'+
+    '<td><input type="date" class="rp_f_'+prefix+'" value="'+r.faellig+'" style="padding:.35rem .5rem;border:1.5px solid var(--linie);border-radius:6px"></td></tr>';
+  }).join('');
+  return '<div style="margin:.4rem 0 .8rem;padding:.7rem .9rem;background:var(--tint);border-radius:10px">'+
+  (titel?'<div style="font-weight:700;font-size:.85rem;margin-bottom:.4rem">'+titel+'</div>':'')+
+  '<table style="border-collapse:collapse"><tr><th style="text-align:left;font-size:.72rem;color:var(--grau);padding:.2rem .6rem .2rem 0"></th><th style="text-align:left;font-size:.72rem;color:var(--grau);padding:.2rem .6rem .2rem 0">Betrag (€)</th><th style="text-align:left;font-size:.72rem;color:var(--grau);padding:.2rem 0">Fällig am</th></tr>'+rows+'</table>'+
+  '<div id="rp_sum_'+prefix+'" style="font-size:.8rem;margin-top:.4rem"></div></div>'+
+  '<script>ratenPlanSumme("'+prefix+'",'+soll+')<\/script>';
+}
+function ratenPlanSumme(prefix,soll){
+  var e=document.getElementById('rp_sum_'+prefix);if(!e)return;
+  var sum=0;document.querySelectorAll('.rp_b_'+prefix).forEach(function(inp){sum+=parseFloat(inp.value)||0;});
+  var diff=Math.round((soll-sum)*100)/100;
+  if(Math.abs(diff)<0.005)e.innerHTML='<span style="color:var(--gruen-dunkel);font-weight:700">✓ Summe '+eur(sum)+' – passt</span>';
+  else e.innerHTML='<span style="color:var(--rot);font-weight:700">Summe '+eur(sum)+' von '+eur(soll)+' – '+(diff>0?'es fehlen '+eur(diff):eur(-diff)+' zu viel')+'</span>';
+}
+function ratenPlanLesen(prefix,soll){
+  var bs=document.querySelectorAll('.rp_b_'+prefix);var fs=document.querySelectorAll('.rp_f_'+prefix);
+  var plan=[];var sum=0;
+  for(var i=0;i<bs.length;i++){
+    var b=Math.round((parseFloat(bs[i].value)||0)*100)/100;var f=fs[i].value;
+    if(!(b>0)){toast('Rate '+(i+1)+': Betrag fehlt',true);return null;}
+    if(!f){toast('Rate '+(i+1)+': Fälligkeitsdatum fehlt',true);return null;}
+    sum+=b;plan.push({betrag:b,faellig:f});
+  }
+  if(Math.abs(Math.round((sum-soll)*100))>0){toast('Die Raten ergeben '+eur(sum)+', müssen aber '+eur(soll)+' ergeben',true);return null;}
+  return plan;
+}
+/* ---- Jahresbeiträge: Plan je Mitgliedsart ---- */
+function jahresbeitraegeStellen(ids){
+  var s=DB.settings;var alle=!ids;
+  var kand=DB.mitglieder.filter(function(m){return m.status==='aktiv'&&(!ids||ids.indexOf(m.id)>=0);});
+  openModal('<h2>Jahresbeiträge stellen'+(alle?'':' ('+kand.length+' ausgewählte)')+'</h2>'+
+  '<div class="frow"><div class="field"><label>Beitragsjahr</label><input id="jb_jahr" type="number" value="'+s.geschaeftsjahr+'" onchange="jbPlanRender('+(alle?'null':JSON.stringify(ids).replace(/"/g,'&quot;'))+')"></div><div class="field"><label>Zahlbar in</label><select id="jb_raten" onchange="jbPlanRender('+(alle?'null':JSON.stringify(ids).replace(/"/g,'&quot;'))+')">'+[1,2,3,4,6,12].map(function(r){return '<option value="'+r+'"'+(r==(s.ratenDefault||1)?' selected':'')+'>'+(r===1?'1 (Gesamtbetrag)':r+' Raten')+'</option>';}).join('')+'</select></div></div>'+
+  '<div id="jb_plan"></div>'+
+  '<div class="hint">Gestellt wird nur für aktive Mitglieder, die für das Jahr noch keinen Beitrag haben. Bei Raten kannst du <b>Betrag und Fälligkeit jeder Rate</b> unten anpassen – die Summe muss den Jahresbeitrag ergeben. Jede Rate wird als eigene offene Forderung gebucht, das Mahnwesen greift automatisch.</div>'+
+  '<div class="mfoot"><button class="btn btn-hell" onclick="closeModal()">Abbrechen</button><button class="btn btn-rot" onclick="jahresbeitraegeAusfuehren('+(alle?'null':JSON.stringify(ids).replace(/"/g,'&quot;'))+')">Beiträge stellen</button></div>');
+  jbPlanRender(ids||null);
+}
+function jbArten(ids){
+  var s=DB.settings;var out=[];
+  Object.keys(ARTEN).forEach(function(art){
+    var n=DB.mitglieder.filter(function(m){return m.status==='aktiv'&&m.art===art&&(!ids||ids.indexOf(m.id)>=0);}).length;
+    if(n>0&&(s.beitraege[art]||0)>0)out.push({art:art,n:n,betrag:s.beitraege[art]});
+  });
+  return out;
+}
+function jbPlanRender(ids){
+  var e=document.getElementById('jb_plan');if(!e)return;
+  var s=DB.settings;var raten=parseInt(val('jb_raten'),10)||1;var jahr=parseInt(val('jb_jahr'),10)||s.geschaeftsjahr;
+  if(raten<2){e.innerHTML='';return;}
+  var f0=jahr+'-'+s.faelligkeit;if(f0<heute()){var d0=new Date();d0.setDate(d0.getDate()+14);f0=d0.toISOString().slice(0,10);}
+  e.innerHTML=jbArten(ids).map(function(a){
+    return ratenPlanHTML('jb_'+a.art,planVorschlag(a.betrag,raten,f0),a.betrag,ARTEN[a.art]+' – '+eur(a.betrag)+' ('+a.n+' Mitglieder)');
+  }).join('');
+  jbArten(ids).forEach(function(a){ratenPlanSumme('jb_'+a.art,a.betrag);});
+}
+function jahresbeitraegeAusfuehren(ids){
+  var jahr=parseInt(val('jb_jahr'),10);var raten=parseInt(val('jb_raten'),10)||1;if(!jahr)return;
+  var plaene={};
+  if(raten>1){
+    var arten=jbArten(ids);
+    for(var i=0;i<arten.length;i++){
+      var p=ratenPlanLesen('jb_'+arten[i].art,arten[i].betrag);
+      if(!p)return;
+      plaene[arten[i].art]=p;
+    }
+  }
+  var n=0,skip=0;
+  DB.mitglieder.filter(function(m){return m.status==='aktiv'&&(!ids||ids.indexOf(m.id)>=0);}).forEach(function(m){
+    if(stellBeitrag(m,jahr,raten,null,plaene[m.art]||null))n++;else skip++;
+  });
+  save();closeModal();toast(n+' Beiträge gestellt'+(skip?', '+skip+' bereits vorhanden':''));go('offen');
+}
+/* ---- Sonderforderung: Plan im Dialog ---- */
+function umPlanRender(){
+  var e=document.getElementById('um_plan');if(!e)return;
+  var raten=parseInt(val('um_raten'),10)||1;var betrag=parseFloat(val('um_betrag'))||0;var f0=val('um_faellig')||fristDatum(30);
+  if(raten<2||!(betrag>0)){e.innerHTML='';return;}
+  e.innerHTML=ratenPlanHTML('um',planVorschlag(betrag,raten,f0),betrag,'Ratenplan pro Mitglied');
+  ratenPlanSumme('um',betrag);
+}
+
+function wizPlanSumTxt(key,soll){
+  var sum=0;(W[key]||[]).forEach(function(r){sum+=parseFloat(r.betrag)||0;});sum=Math.round(sum*100)/100;
+  var diff=Math.round((soll-sum)*100)/100;
+  if(Math.abs(diff)<0.005)return '<span style="color:var(--gruen-dunkel);font-weight:700">✓ Summe '+eur(sum)+' – passt</span>';
+  return '<span style="color:var(--rot);font-weight:700">Summe '+eur(sum)+' von '+eur(soll)+' – '+(diff>0?'es fehlen '+eur(diff):eur(-diff)+' zu viel')+'</span>';
+}
+function wizPlanSet(key,i,feld,wert,soll){
+  if(!W[key]||!W[key][i])return;
+  W[key][i][feld]=feld==='betrag'?(Math.round((parseFloat(wert)||0)*100)/100):wert;
+  var e=document.getElementById('wp_sum_'+key);if(e)e.innerHTML=wizPlanSumTxt(key,soll);
+}
+function wizPlanHTML(typ){
+  var s=DB.settings;
+  var raten=typ==='beitrag'?(parseInt(W.raten,10)||1):(parseInt(W.ratenEintritt,10)||1);
+  if(raten<2)return '';
+  var soll=typ==='beitrag'?(s.beitraege[W.art]||0):s.eintrittsgeld;
+  var key=typ==='beitrag'?'beitragPlan':'eintrittPlan';
+  var f0=typ==='beitrag'?(jahrVon(W.eintritt)+'-'+s.faelligkeit):W.eintritt;
+  if(f0<W.eintritt)f0=W.eintritt;
+  if(!W[key]||W[key].length!==raten)W[key]=planVorschlag(soll,raten,f0);
+  var rows=W[key].map(function(r,i){
+    return '<tr><td style="white-space:nowrap;color:var(--grau);font-size:.82rem;padding-right:.5rem">Rate '+(i+1)+'</td>'+
+    '<td style="padding-right:.5rem"><input type="number" step="0.01" min="0.01" value="'+r.betrag+'" oninput="wizPlanSet(\''+key+'\','+i+',\'betrag\',this.value,'+soll+')" style="width:100px;padding:.35rem .5rem;border:1.5px solid var(--linie);border-radius:6px"></td>'+
+    '<td><input type="date" value="'+r.faellig+'" onchange="wizPlanSet(\''+key+'\','+i+',\'faellig\',this.value,'+soll+')" style="padding:.35rem .5rem;border:1.5px solid var(--linie);border-radius:6px"></td></tr>';
+  }).join('');
+  return '<div style="margin-top:.5rem;padding:.6rem .8rem;background:#fff;border:1.5px dashed var(--linie);border-radius:8px"><table style="border-collapse:collapse"><tr><th></th><th style="text-align:left;font-size:.72rem;color:var(--grau)">Betrag (€)</th><th style="text-align:left;font-size:.72rem;color:var(--grau)">Fällig am</th></tr>'+rows+'</table><div id="wp_sum_'+key+'" style="font-size:.8rem;margin-top:.35rem">'+wizPlanSumTxt(key,soll)+'</div></div>';
+}
+function wizPlanValid(key,soll,raten){
+  if((parseInt(raten,10)||1)<2)return true;
+  var plan=W[key];if(!plan)return true;
+  var sum=0;
+  for(var i=0;i<plan.length;i++){
+    if(!(plan[i].betrag>0)){toast('Rate '+(i+1)+': Betrag fehlt',true);return false;}
+    if(!plan[i].faellig){toast('Rate '+(i+1)+': Fälligkeit fehlt',true);return false;}
+    sum+=plan[i].betrag;
+  }
+  if(Math.abs(Math.round((sum-soll)*100))>0){toast('Ratensumme '+eur(Math.round(sum*100)/100)+' ≠ '+eur(soll),true);return false;}
+  return true;
 }
 
 /* ---------- Start ---------- */
