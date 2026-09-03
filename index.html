@@ -608,7 +608,22 @@ function exportJournalCSV(j){
    ============================================================ */
 function backupExport(){download('bsk-verwaltung-backup-'+heute()+'.json',JSON.stringify(DB,null,1),'application/json');}
 function backupImport(inp){var f=inp.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var d=JSON.parse(r.result);if(!d.settings||!d.mitglieder)throw 0;if(!confirm('Backup importieren? Die aktuellen Daten werden ersetzt.'))return;DB=d;save();brand();toast('Backup importiert');go('dashboard');}catch(e){toast('Ungültige Backup-Datei',true);}};r.readAsText(f);}
-function allesLoeschen(){if(prompt('Wirklich ALLE Daten löschen? Tippe LÖSCHEN zur Bestätigung:')!=='LÖSCHEN')return;DB=defaultDB();save();brand();go('dashboard');toast('Alle Daten gelöscht');}
+function mitgliedLoeschen(id){
+  var m=mitglied(id);if(!m)return;
+  var bu=DB.buchungen.filter(function(b){return b.mitgliedId===id;});
+  if(!confirm('Mitgliedschaft '+m.mitgliedsnr+' ENDGÜLTIG löschen?\n\nDer Kontakt (Person) bleibt erhalten. Nutze das nur zum Aufräumen von Fehleingaben – für normale Kündigungen bitte „Austritt erfassen“.'))return;
+  var mitBu=false;
+  if(bu.length)mitBu=confirm(bu.length+' Buchungen gehören zu dieser Mitgliedschaft (Beiträge, Zahlungen …).\n\nOK = Buchungen AUCH löschen\nAbbrechen = Buchungen behalten (bleiben beim Kontakt)');
+  if(mitBu)DB.buchungen=DB.buchungen.filter(function(b){return b.mitgliedId!==id;});
+  else DB.buchungen.forEach(function(b){if(b.mitgliedId===id)b.mitgliedId=null;});
+  DB.schreiben.forEach(function(e){if(e.mitgliedId===id)e.mitgliedId=null;});
+  var kid=m.kontaktId;
+  DB.mitglieder=DB.mitglieder.filter(function(x){return x.id!==id;});
+  save();closeModal();toast('Mitgliedschaft '+m.mitgliedsnr+' gelöscht'+(mitBu?' (inkl. Buchungen)':''));
+  if(current==='mitglieder')vMitglieder();else if(current==='kontakte')vKontakte();
+  if(kid&&kontakt(kid))kontaktDetail(kid);
+}
+function allesLoeschen(){if(prompt('Wirklich ALLE Daten löschen? Tippe LÖSCHEN zur Bestätigung:')!=='LÖSCHEN')return;DB=defaultDB();try{localStorage.setItem(KEY,JSON.stringify(DB));}catch(e){}load();save();brand();go('dashboard');toast('Alle Daten gelöscht');}
 function brand(){document.getElementById('brandName').textContent=DB.settings.vereinsname;document.getElementById('brandForm').textContent=DB.settings.rechtsform+' · Vereinsverwaltung';}
 
 /* ============================================================
@@ -939,7 +954,7 @@ function vEinstellungen(){
   '<div class="card" style="margin-bottom:1rem"><h3>Bankverbindung & SEPA</h3>'+
   '<div class="frow"><div class="field"><label>Kontoinhaber</label><input id="s_inhaber" value="'+esc(s.kontoinhaber||'')+'" placeholder="z. B. Tom Hollinder oder Vereinsname"></div><div class="field"><label>Bank</label><input id="s_bank" value="'+esc(s.bank||'')+'" placeholder="C24 Bank"></div></div>'+
   '<div class="frow"><div class="field"><label>IBAN</label><input id="s_iban" value="'+esc(s.iban||'')+'"></div><div class="field"><label>Gläubiger-ID (SEPA)</label><input id="s_glid" value="'+esc(s.glaeubigerId||'')+'" placeholder="DE98ZZZ09999999999"></div></div></div>'+
-  '<div class="card"><h3>Datensicherung</h3><p style="font-size:.86rem;color:var(--grau);margin-bottom:.8rem">Alle Daten liegen nur in diesem Browser auf diesem Gerät. <b style="color:var(--ink)">Lade regelmäßig ein Backup herunter</b> und bewahre es sicher auf (Mitgliederdaten = personenbezogene Daten!).</p>'+
+  '<div class="card"><h3>Datensicherung</h3><p style="font-size:.86rem;color:var(--grau);margin-bottom:.8rem">Im Team-Modus liegen die Daten auf eurem Vereinsserver – „Alles löschen“ setzt den gemeinsamen Stand für ALLE zurück. <b style="color:var(--ink)">Lade regelmäßig ein Backup herunter</b> und bewahre es sicher auf (Mitgliederdaten = personenbezogene Daten!).</p>'+
   '<div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn btn-gruen" onclick="backupExport()">Backup herunterladen (JSON)</button><label class="btn btn-hell" style="cursor:pointer">Backup importieren<input type="file" accept=".json" style="display:none" onchange="backupImport(this)"></label><button class="btn btn-ghost" onclick="allesLoeschen()">Alles löschen</button></div>'+
   '<p style="font-size:.78rem;color:var(--grau);margin-top:.8rem">Stand: '+DB.kontakte.length+' Kontakte · '+DB.mitglieder.length+' Mitgliedschaften · '+DB.buchungen.length+' Buchungen · '+DB.schreiben.length+' Schreiben</p></div></div>'+
   '<div><div class="card" style="margin-bottom:1rem"><h3>Beiträge, Fristen & Nummernkreise</h3>'+
@@ -1124,7 +1139,7 @@ function mitgliedDetail(id){
   '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn btn-rot btn-sm" onclick="briefDrucken(\'beitritt\',\''+id+'\')">Beitrittsbestätigung</button><button class="btn btn-hell btn-sm" onclick="vertragDrucken(\''+id+'\')">Mitgliedschaftsvertrag</button><button class="btn btn-hell btn-sm" onclick="sepaDrucken(\''+id+'\')">SEPA-Mandat</button></div>'+
   '<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn btn-hell btn-sm" onclick="briefDrucken(\'zahlung\',\''+id+'\')">Zahlungserinnerung</button><button class="btn btn-hell btn-sm" onclick="briefDrucken(\'mahnung\',\''+id+'\')">1. Mahnung</button><button class="btn btn-hell btn-sm" onclick="briefDrucken(\'mahnung2\',\''+id+'\')">2. Mahnung</button><button class="btn btn-ghost btn-sm" onclick="anhoerungDialog(\''+id+'\')">Anhörung</button><button class="btn btn-ghost btn-sm" onclick="ausschlussDialog(\''+id+'\')">Ausschluss</button></div></div>'+
   (m.notizen?'<p style="margin-top:.8rem;font-size:.86rem"><b>Notiz:</b> '+esc(m.notizen)+'</p>':'')+
-  '<div class="mfoot" style="justify-content:flex-start"><button class="btn btn-hell btn-sm" onclick="kontaktForm(\''+k.id+'\',function(){mitgliedDetail(\''+id+'\')})">Kontaktdaten bearbeiten</button><button class="btn btn-hell btn-sm" onclick="mitgliedBearbeiten(\''+id+'\')">Mitgliedschaft bearbeiten</button>'+(m.status==='aktiv'?'<button class="btn btn-hell btn-sm" onclick="beitragStellen(\''+id+'\')">Jahresbeitrag stellen</button><button class="btn btn-ghost btn-sm" onclick="mitgliedAustritt(\''+id+'\')">Austritt erfassen</button>':'<button class="btn btn-gruen btn-sm" onclick="mitgliedReaktivieren(\''+id+'\')">Reaktivieren</button>')+'</div></div>'+
+  '<div class="mfoot" style="justify-content:flex-start"><button class="btn btn-hell btn-sm" onclick="kontaktForm(\''+k.id+'\',function(){mitgliedDetail(\''+id+'\')})">Kontaktdaten bearbeiten</button><button class="btn btn-hell btn-sm" onclick="mitgliedBearbeiten(\''+id+'\')">Mitgliedschaft bearbeiten</button>'+(m.status==='aktiv'?'<button class="btn btn-hell btn-sm" onclick="beitragStellen(\''+id+'\')">Jahresbeitrag stellen</button><button class="btn btn-ghost btn-sm" onclick="mitgliedAustritt(\''+id+'\')">Austritt erfassen</button>':'<button class="btn btn-gruen btn-sm" onclick="mitgliedReaktivieren(\''+id+'\')">Reaktivieren</button>')+'<button class="btn btn-ghost btn-sm" onclick="mitgliedLoeschen(\''+id+'\')">Mitgliedschaft löschen</button>'+'</div></div>'+
   '<div id="md_konto" style="display:none">'+(off>0?'<div class="hint warn"><b>Offen: '+eur(off)+'</b></div>':'')+
   '<div class="tbl-wrap"><table><tr><th>Fällig</th><th>Beleg</th><th>Text</th><th>Status</th><th>Mahnstufe</th><th class="num">Betrag</th><th></th></tr>'+(bu.length?bu.map(function(b){return '<tr><td>'+dt(b.faellig||b.datum)+'</td><td>'+b.belegnr+'</td><td>'+esc(b.text)+'</td><td>'+bStatus(b)+'</td><td>'+(b.status==='offen'?mahnTag(b):'')+'</td><td class="num">'+eur(b.betrag)+'</td><td class="akt">'+(b.status==='offen'?'<button class="btn btn-gruen btn-sm" onclick="zahlungDialog(\''+b.id+'\')">Zahlung</button> ':'')+'<button class="btn btn-hell btn-sm" onclick="belegDrucken([\''+b.id+'\'])">Beleg</button></td></tr>';}).join(''):'<tr><td colspan="7" class="empty">Keine Buchungen.</td></tr>')+'</table></div></div>'+
   '<div id="md_verlauf" style="display:none">'+verlaufHTML(m)+'</div>'+
